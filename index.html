@@ -4,20 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Blog</title>
-  <link rel="stylesheet" href="templates/styles.css">
+  <link rel="stylesheet" href="./templates/styles.css">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
   <div id="base-content"></div>
-
   <script>
     // Fetch base.html and insert it into the page
-    fetch('/templates/base.html')
+    fetch('./templates/base.html')
       .then(response => response.text())
       .then(baseTemplate => {
         // Insert the base template
         document.getElementById('base-content').innerHTML = baseTemplate;
-
         // Add the blog post list and content inside the main section
         const main = document.querySelector('main');
         main.innerHTML = `
@@ -27,7 +25,6 @@
             <div id="post-content" style="display: none;"></div>
           </section>
         `;
-
         // Fetch the list of markdown files from posts/
         fetch('https://api.github.com/repos/Arunragula/Blogs/contents/posts')
           .then(response => response.json())
@@ -49,7 +46,6 @@
           });
       })
       .catch(error => console.error('Error loading base.html:', error));
-
     // Function to load and render a specific post
     function loadPost(url, date) {
       fetch(url)
@@ -62,9 +58,8 @@
           const frontmatterLines = frontmatter.split('\n');
           const title = frontmatterLines.find(line => line.startsWith('title:')).replace('title: ', '').replace(/"/g, '');
           const htmlContent = marked.parse(content);
-
           // Fetch the post_template.html
-          fetch('/templates/post_template.html')
+          fetch('./templates/post_template.html')
             .then(response => response.text())
             .then(template => {
               // Replace placeholders in the template
