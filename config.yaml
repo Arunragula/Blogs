@@ -1,3 +1,10 @@
-gemini_api_key: "AIzaSyBhHP2suZkxUvWsycYqwbEzLjg__Kt_yXs"
-github_repo: "YOUR_GITHUB_USERNAME/YOUR_REPO_NAME"
+gemini_api_key: "YOUR_API_KEY_HERE"  # Replace with a secure API key or use secrets
+github_repo: "Arunragula/Blogs"
 commit_message: "Auto-generated blog post"
+blog_frequency: "daily"
+blog_topics:
+  - "AI trends"
+  - "Machine learning innovations"
+  - "Data science"
+  - "Technology advancements"
+  - "Programming best practices"
