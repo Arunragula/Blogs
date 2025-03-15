@@ -2,6 +2,8 @@ import requests
 import datetime
 import yaml
 import os
+import json
+from pathlib import Path
 
 # Load API key from config.yaml
 with open("config.yaml", "r") as config_file:
@@ -15,7 +17,9 @@ API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-f
 os.makedirs("posts", exist_ok=True)
 
 def generate_blog():
-    prompt = "Write a 500-word blog on the latest AI trends in a professional tone."
+    today = datetime.date.today().strftime("%Y-%m-%d")
+    title = f"AI Trends and Innovations: {today} Update"
+    prompt = f"Write a 500-word blog titled '{title}' about the latest AI trends in a professional tone. Include 5 sections with headers."
 
     data = {
         "contents": [{
@@ -33,20 +37,30 @@ def generate_blog():
         # Extract generated text
         blog_content = result["candidates"][0]["content"]["parts"][0]["text"]
 
-        today = datetime.date.today().strftime("%Y-%m-%d")
         filename = f"posts/blog_{today}.md"
+
+        # Format as markdown with frontmatter
+        formatted_content = f"""---
+title: "{title}"
+date: {today}
+---
+
+{blog_content}
+"""
 
         # Save the blog
         with open(filename, "w", encoding="utf-8") as file:
-            file.write(blog_content)
+            file.write(formatted_content)
 
         print(f"✅ Blog saved: {filename}")
         return filename
 
     except requests.exceptions.RequestException as e:
         print(f"❌ API Request Error: {e}")
-    except KeyError:
-        print(f"❌ Unexpected API Response: {result}")
+        return None
+    except KeyError as e:
+        print(f"❌ Unexpected API Response: {e}")
+        return None
 
 if __name__ == "__main__":
     generate_blog()
