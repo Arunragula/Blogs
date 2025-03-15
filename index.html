@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Blog</title>
+  <link rel="stylesheet" href="templates/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+  <div id="base-content"></div>
+
+  <script>
+    // Fetch base.html and insert it into the page
+    fetch('/templates/base.html')
+      .then(response => response.text())
+      .then(baseTemplate => {
+        // Insert the base template
+        document.getElementById('base-content').innerHTML = baseTemplate;
+
+        // Add the blog post list and content inside the main section
+        const main = document.querySelector('main');
+        main.innerHTML = `
+          <section id="blog-posts">
+            <h2>Latest Blog Posts</h2>
+            <ul id="post-list"></ul>
+            <div id="post-content" style="display: none;"></div>
+          </section>
+        `;
+
+        // Fetch the list of markdown files from posts/
+        fetch('https://api.github.com/repos/Arunragula/Blogs/contents/posts')
+          .then(response => response.json())
+          .then(files => {
+            const postList = document.getElementById('post-list');
+            files.forEach(file => {
+              if (file.name.endsWith('.md')) {
+                const postName = file.name.replace('.md', '');
+                const postDate = postName.split('_')[1]; // Extract date (e.g., 2025-03-15)
+                const li = document.createElement('li');
+                li.innerHTML = `<a href="#" onclick="loadPost('${file.download_url}', '${postDate}'); return false;">${postName}</a> (${postDate})`;
+                postList.appendChild(li);
+              }
+            });
+          })
+          .catch(error => {
+            console.error('Error fetching posts:', error);
+            document.getElementById('post-list').innerHTML = '<li>Error loading posts. Check console.</li>';
+          });
+      })
+      .catch(error => console.error('Error loading base.html:', error));
+
+    // Function to load and render a specific post
+    function loadPost(url, date) {
+      fetch(url)
+        .then(response => response.text())
+        .then(markdown => {
+          // Parse the markdown to extract frontmatter and content
+          const frontmatterEnd = markdown.indexOf('---', 3);
+          const frontmatter = markdown.substring(4, frontmatterEnd);
+          const content = markdown.substring(frontmatterEnd + 4).trim();
+          const frontmatterLines = frontmatter.split('\n');
+          const title = frontmatterLines.find(line => line.startsWith('title:')).replace('title: ', '').replace(/"/g, '');
+          const htmlContent = marked.parse(content);
+
+          // Fetch the post_template.html
+          fetch('/templates/post_template.html')
+            .then(response => response.text())
+            .then(template => {
+              // Replace placeholders in the template
+              let renderedPost = template
+                .replace('{{title}}', title)
+                .replace('{{date}}', date)
+                .replace('{{content}}', htmlContent);
+              document.getElementById('post-content').innerHTML = renderedPost;
+              document.getElementById('post-content').style.display = 'block';
+            })
+            .catch(error => console.error('Error loading template:', error));
+        })
+        .catch(error => console.error('Error loading post:', error));
+    }
+  </script>
+</body>
+</html>
