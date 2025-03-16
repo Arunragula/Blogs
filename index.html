@@ -10,6 +10,23 @@
 <body>
   <div id="base-content"></div>
   <script>
+    // Store view counts in localStorage
+    function getViewCounts() {
+      const counts = localStorage.getItem('blogViewCounts');
+      return counts ? JSON.parse(counts) : {};
+    }
+
+    function saveViewCounts(counts) {
+      localStorage.setItem('blogViewCounts', JSON.stringify(counts));
+    }
+
+    function incrementViewCount(postId) {
+      const counts = getViewCounts();
+      counts[postId] = (counts[postId] || 0) + 1;
+      saveViewCounts(counts);
+      return counts[postId];
+    }
+    
     // Fetch base.html and insert it into the page
     fetch('./templates/base.html')
       .then(response => response.text())
@@ -19,17 +36,56 @@
         // Add the blog post list and content inside the main section
         const main = document.querySelector('main');
         main.innerHTML = `
+          <section id="category-filter">
+            <h3>Filter by Category:</h3>
+            <div class="category-buttons">
+              <button class="category-btn active" data-category="all">All</button>
+              <button class="category-btn" data-category="AI & Machine Learning">AI & ML</button>
+              <button class="category-btn" data-category="Technology">Technology</button>
+              <button class="category-btn" data-category="Finance & Business">Finance</button>
+              <button class="category-btn" data-category="Science & Innovation">Science</button>
+            </div>
+          </section>
           <section id="blog-posts">
             <h2>Latest Blog Posts</h2>
-            <ul id="post-list"></ul>
+            <div id="post-list" class="grid-layout"></div>
             <div id="post-content" style="display: none;"></div>
           </section>
         `;
+        
+        // Add event listener for category buttons
+        document.querySelectorAll('.category-btn').forEach(button => {
+          button.addEventListener('click', function() {
+            // Remove active class from all buttons
+            document.querySelectorAll('.category-btn').forEach(btn => {
+              btn.classList.remove('active');
+            });
+            // Add active class to clicked button
+            this.classList.add('active');
+            
+            const category = this.getAttribute('data-category');
+            filterPostsByCategory(category);
+          });
+        });
+        
+        // Function to filter posts by category
+        function filterPostsByCategory(category) {
+          document.querySelectorAll('.post-card').forEach(post => {
+            if (category === 'all' || post.getAttribute('data-category') === category) {
+              post.style.display = 'block';
+            } else {
+              post.style.display = 'none';
+            }
+          });
+        }
+        
         // Fetch the list of markdown files from posts/
         fetch('https://api.github.com/repos/Arunragula/Blogs/contents/posts')
           .then(response => response.json())
           .then(files => {
             const postList = document.getElementById('post-list');
+            const viewCounts = getViewCounts();
+            
             // Sort files by name in descending order to show newest first
             files.sort((a, b) => b.name.localeCompare(a.name));
             
@@ -37,8 +93,10 @@
               if (file.name.endsWith('.md')) {
                 const postName = file.name.replace('.md', '');
                 const postDate = postName.split('_')[1]; // Extract date (e.g., 2025-03-15)
+                const postId = file.name; // Use filename as unique identifier
+                const viewCount = viewCounts[postId] || 0; // Get view count or default to 0
                 
-                // First fetch the file to get its title
+                // First fetch the file to get its frontmatter data
                 fetch(file.download_url)
                   .then(response => response.text())
                   .then(markdown => {
@@ -46,33 +104,89 @@
                     const frontmatterEnd = markdown.indexOf('---', 3);
                     const frontmatter = markdown.substring(4, frontmatterEnd);
                     const frontmatterLines = frontmatter.split('\n');
+                    
+                    // Extract metadata from frontmatter
                     const title = frontmatterLines.find(line => line.startsWith('title:'))
                       ?.replace('title:', '')
                       ?.trim()
                       ?.replace(/"/g, '') || postName;
+                      
+                    const category = frontmatterLines.find(line => line.startsWith('category:'))
+                      ?.replace('category:', '')
+                      ?.trim()
+                      ?.replace(/"/g, '') || 'Uncategorized';
+                      
+                    const topic = frontmatterLines.find(line => line.startsWith('topic:'))
+                      ?.replace('topic:', '')
+                      ?.trim()
+                      ?.replace(/"/g, '') || '';
+                      
+                    const image = frontmatterLines.find(line => line.startsWith('image:'))
+                      ?.replace('image:', '')
+                      ?.trim()
+                      ?.replace(/"/g, '') || '';
                     
-                    const li = document.createElement('li');
-                    li.innerHTML = `<a href="#" onclick="loadPost('${file.download_url}', '${postDate}'); return false;">${title}</a> (${postDate})`;
-                    postList.appendChild(li);
+                    // Get preview text (first 150 characters after frontmatter)
+                    const content = markdown.substring(frontmatterEnd + 4);
+                    const contentWithoutHeaders = content.replace(/#+\s.*\n/g, ''); // Remove headers
+                    const cleanContent = contentWithoutHeaders.replace(/!\[.*\]\(.*\)/g, ''); // Remove images
+                    const previewText = cleanContent.substring(0, 150).trim() + '...';
+                    
+                    // Create post card
+                    const postCard = document.createElement('div');
+                    postCard.className = 'post-card';
+                    postCard.setAttribute('data-category', category);
+                    
+                    const categoryClass = category.toLowerCase().replace(/[^a-z0-9]/g, '-');
+                    
+                    postCard.innerHTML = `
+                      <div class="card-image">
+                        ${image ? `<img src="${image}" alt="${title}">` : '<div class="no-image"></div>'}
+                        <span class="category-badge ${categoryClass}">${category}</span>
+                      </div>
+                      <div class="card-content">
+                        <h3><a href="#" onclick="loadPost('${file.download_url}', '${postDate}', '${postId}'); return false;">${title}</a></h3>
+                        <p class="post-date">Published on ${postDate} · <span class="view-count" id="count-${postId}">👁️ ${viewCount} views</span></p>
+                        <p class="preview-text">${previewText}</p>
+                        <a href="#" class="read-more" onclick="loadPost('${file.download_url}', '${postDate}', '${postId}'); return false;">Read More</a>
+                      </div>
+                    `;
+                    
+                    postList.appendChild(postCard);
                   })
                   .catch(error => {
                     console.error('Error fetching post:', error);
                     // Fallback to filename if we can't get the title
-                    const li = document.createElement('li');
-                    li.innerHTML = `<a href="#" onclick="loadPost('${file.download_url}', '${postDate}'); return false;">${postName}</a> (${postDate})`;
-                    postList.appendChild(li);
+                    const postCard = document.createElement('div');
+                    postCard.className = 'post-card';
+                    postCard.setAttribute('data-category', 'Uncategorized');
+                    
+                    postCard.innerHTML = `
+                      <div class="card-image">
+                        <div class="no-image"></div>
+                        <span class="category-badge">Uncategorized</span>
+                      </div>
+                      <div class="card-content">
+                        <h3><a href="#" onclick="loadPost('${file.download_url}', '${postDate}', '${postId}'); return false;">${postName}</a></h3>
+                        <p class="post-date">Published on ${postDate} · <span class="view-count" id="count-${postId}">👁️ ${viewCount} views</span></p>
+                        <a href="#" class="read-more" onclick="loadPost('${file.download_url}', '${postDate}', '${postId}'); return false;">Read More</a>
+                      </div>
+                    `;
+                    
+                    postList.appendChild(postCard);
                   });
               }
             });
           })
           .catch(error => {
             console.error('Error fetching posts:', error);
-            document.getElementById('post-list').innerHTML = '<li>Error loading posts. Check console.</li>';
+            document.getElementById('post-list').innerHTML = '<div class="error-message">Error loading posts. Check console.</div>';
           });
       })
       .catch(error => console.error('Error loading base.html:', error));
+      
     // Function to load and render a specific post
-    function loadPost(url, date) {
+    function loadPost(url, date, postId) {
       fetch(url)
         .then(response => response.text())
         .then(markdown => {
@@ -80,9 +194,25 @@
           const frontmatterEnd = markdown.indexOf('---', 3);
           const frontmatter = markdown.substring(4, frontmatterEnd);
           const content = markdown.substring(frontmatterEnd + 4).trim();
+          
+          // Extract metadata
           const frontmatterLines = frontmatter.split('\n');
-          const title = frontmatterLines.find(line => line.startsWith('title:')).replace('title:', '').replace(/"/g, '').trim();
+          const title = frontmatterLines.find(line => line.startsWith('title:'))?.replace('title:', '').replace(/"/g, '').trim();
+          const category = frontmatterLines.find(line => line.startsWith('category:'))?.replace('category:', '').replace(/"/g, '').trim();
+          const topic = frontmatterLines.find(line => line.startsWith('topic:'))?.replace('topic:', '').replace(/"/g, '').trim();
+          
+          // Convert markdown to HTML
           const htmlContent = marked.parse(content);
+          
+          // Increment view count
+          const newViewCount = incrementViewCount(postId);
+          
+          // Update view count display
+          const countElement = document.getElementById(`count-${postId}`);
+          if (countElement) {
+            countElement.textContent = `👁️ ${newViewCount} views`;
+          }
+          
           // Fetch the post_template.html
           fetch('./templates/post_template.html')
             .then(response => response.text())
@@ -91,9 +221,24 @@
               let renderedPost = template
                 .replace('{{title}}', title)
                 .replace('{{date}}', date)
-                .replace('{{content}}', htmlContent);
+                .replace('{{category}}', category || 'Uncategorized')
+                .replace('{{content}}', htmlContent)
+                .replace('{{viewCount}}', newViewCount);
+              
+              // Hide the post list and show the post content
+              document.getElementById('post-list').style.display = 'none';
               document.getElementById('post-content').innerHTML = renderedPost;
               document.getElementById('post-content').style.display = 'block';
+              
+              // Add back button
+              const backButton = document.createElement('button');
+              backButton.className = 'back-button';
+              backButton.textContent = '← Back to Posts';
+              backButton.onclick = function() {
+                document.getElementById('post-content').style.display = 'none';
+                document.getElementById('post-list').style.display = 'grid';
+              };
+              document.getElementById('post-content').prepend(backButton);
             })
             .catch(error => console.error('Error loading template:', error));
         })
