@@ -1,2 +1,2 @@
 # Blogs
-This project automatically generates daily blog posts and uploads them to GitHub.
+This project automatically generates daily blog posts and uploads them .
