@@ -30,13 +30,38 @@
           .then(response => response.json())
           .then(files => {
             const postList = document.getElementById('post-list');
+            // Sort files by name in descending order to show newest first
+            files.sort((a, b) => b.name.localeCompare(a.name));
+            
             files.forEach(file => {
               if (file.name.endsWith('.md')) {
                 const postName = file.name.replace('.md', '');
                 const postDate = postName.split('_')[1]; // Extract date (e.g., 2025-03-15)
-                const li = document.createElement('li');
-                li.innerHTML = `<a href="#" onclick="loadPost('${file.download_url}', '${postDate}'); return false;">${postName}</a> (${postDate})`;
-                postList.appendChild(li);
+                
+                // First fetch the file to get its title
+                fetch(file.download_url)
+                  .then(response => response.text())
+                  .then(markdown => {
+                    // Parse the markdown to extract frontmatter
+                    const frontmatterEnd = markdown.indexOf('---', 3);
+                    const frontmatter = markdown.substring(4, frontmatterEnd);
+                    const frontmatterLines = frontmatter.split('\n');
+                    const title = frontmatterLines.find(line => line.startsWith('title:'))
+                      ?.replace('title:', '')
+                      ?.trim()
+                      ?.replace(/"/g, '') || postName;
+                    
+                    const li = document.createElement('li');
+                    li.innerHTML = `<a href="#" onclick="loadPost('${file.download_url}', '${postDate}'); return false;">${title}</a> (${postDate})`;
+                    postList.appendChild(li);
+                  })
+                  .catch(error => {
+                    console.error('Error fetching post:', error);
+                    // Fallback to filename if we can't get the title
+                    const li = document.createElement('li');
+                    li.innerHTML = `<a href="#" onclick="loadPost('${file.download_url}', '${postDate}'); return false;">${postName}</a> (${postDate})`;
+                    postList.appendChild(li);
+                  });
               }
             });
           })
@@ -56,7 +81,7 @@
           const frontmatter = markdown.substring(4, frontmatterEnd);
           const content = markdown.substring(frontmatterEnd + 4).trim();
           const frontmatterLines = frontmatter.split('\n');
-          const title = frontmatterLines.find(line => line.startsWith('title:')).replace('title: ', '').replace(/"/g, '');
+          const title = frontmatterLines.find(line => line.startsWith('title:')).replace('title:', '').replace(/"/g, '').trim();
           const htmlContent = marked.parse(content);
           // Fetch the post_template.html
           fetch('./templates/post_template.html')
