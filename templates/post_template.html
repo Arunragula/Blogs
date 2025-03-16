@@ -1,7 +1,13 @@
 <div class="post">
   <h1>{{title}}</h1>
-  <p class="date">Published on {{date}}</p>
+  <div class="post-meta">
+    <span class="category-badge">{{category}}</span>
+    <p class="date">Published on {{date}} <span class="views">👁️ {{viewCount}} views</span></p>
+  </div>
   <div class="content">
     {{content}}
+  </div>
+  <div class="post-footer">
+    <p>Want to read more posts like this? <a href="#" onclick="document.querySelector('.back-button').click(); return false;">Browse our blog</a></p>
   </div>
 </div>
